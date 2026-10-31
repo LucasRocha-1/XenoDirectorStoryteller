@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <XenoDirector.MenaceGauge>Menace Gauge: {0}</XenoDirector.MenaceGauge>
+  <XenoDirector.ActiveBrains>Active Brains: {0} micro + 1 director</XenoDirector.ActiveBrains>
+  <XenoDirector.PlayerStyle>Detected player style: {0}</XenoDirector.PlayerStyle>
+  <XenoDirector.ModCoordination>Coordinating {0} mods / {1} incident sources</XenoDirector.ModCoordination>
+  <XenoDirector.Debug.BrainSpawned>Temporary micro-brain spawned (id={0})</XenoDirector.Debug.BrainSpawned>
+  <XenoDirector.Debug.BrainDespawned>Temporary micro-brain despawned (id={0})</XenoDirector.Debug.BrainDespawned>
+  <XenoDirector.Restriction.Activated>Restriction activated: {0}</XenoDirector.Restriction.Activated>
+  <XenoDirector.Restriction.Deactivated>Restriction deactivated: {0}</XenoDirector.Restriction.Deactivated>
+  <XenoDirector.Restriction.Single>Single — no new colonists</XenoDirector.Restriction.Single>
+  <XenoDirector.Restriction.ZombieApocalypse>Zombie Apocalypse — Undead only + Anomaly events</XenoDirector.Restriction.ZombieApocalypse>
+  <XenoDirector.Restriction.NaturesWrath>Nature's Wrath — natural disasters in sequence</XenoDirector.Restriction.NaturesWrath>
+</LanguageData>

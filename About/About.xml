@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>XenoDirector Storyteller</name>
+  <author>Lucas Vargas de Brito Rocha (skeleton)</author>
+  <packageId>lucas.xenodirector.storyteller</packageId>
+  <supportedVersions>
+    <li>1.5</li>
+    <li>1.6</li>
+  </supportedVersions>
+  <description>
+Storyteller inspirado na IA dual do Xenomorfo de Alien: Isolation.
+
+Arquitetura de múltiplos "cérebros":
+- 1 Macro-Director (sempre presente): gerencia tensão/menace gauge, pacing narrativo e coordenação global.
+- N Micro-Brains (configurável permanentemente ou temporariamente em runtime): tomam decisões locais de eventos, quests e reações.
+
+Recursos do esqueleto:
+- Detecção de como o jogador reage a eventos (mood, thoughts, wealth delta, pause patterns, colonist losses).
+- Escalabilidade de cérebros (código + runtime).
+- Otimização agressiva para saves longos e listas enormes de mods (caching, bounded history, lazy catalogs, tick throttling).
+- Leitura e coordenação de IncidentDefs / QuestScripts de múltiplos mods simultaneamente para criar arcos narrativos coerentes.
+
+Base técnica alinhada com Engenharia de Software + IA Aplicada (pré-processamento de estado da colônia, classificação de estilo de jogador, clusterização de eventos, regressão de tensão).
+  </description>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+      <downloadUrl>https://github.com/pardeike/Harmony/releases/latest</downloadUrl>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>Ludeon.RimWorld</li>
+    <li>Ludeon.RimWorld.Royalty</li>
+    <li>Ludeon.RimWorld.Ideology</li>
+    <li>Ludeon.RimWorld.Biotech</li>
+    <li>Ludeon.RimWorld.Anomaly</li>
+  </loadAfter>
+</ModMetaData>
