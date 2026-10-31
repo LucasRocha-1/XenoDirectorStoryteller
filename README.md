@@ -28,7 +28,9 @@ O jogador pode ativar restrições narrativas. O storyteller **reage imediatamen
    - `PawnGroupMaker.GeneratePawns` → filtra options para só Undead.
    - `QuestPart_SpawnPawn` + `IncidentWorker_WandererJoin` → Single.
 
-Ativação: **Mod Settings** (com save aberto) ou via código `RestrictionManager.Activate("Single")`.
+O mod aparece em **Options → Mod settings** quando está ativo. O storyteller **XenoDirector** fica disponível na tela de seleção de storytellers.
+
+Ativação de restrições: **Mod Settings** (com save aberto) ou via código `RestrictionManager.Activate("Single")`.
 
 ## Objetivos do esqueleto
 

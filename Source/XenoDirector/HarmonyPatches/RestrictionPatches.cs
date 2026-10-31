@@ -111,15 +111,14 @@ namespace XenoDirector
     }
 
     // ---------- Bloqueia recompensas de quest que adicionam pawns (Single) ----------
-    [HarmonyPatch(typeof(QuestPart_SpawnPawn), "Notify_QuestSignalReceived")]
-    public static class Patch_QuestPart_SpawnPawn
+    [HarmonyPatch(typeof(QuestPart_PawnsArrive), nameof(QuestPart_PawnsArrive.Notify_QuestSignalReceived))]
+    public static class Patch_QuestPart_PawnsArrive
     {
-        public static bool Prefix()
+        public static bool Prefix(QuestPart_PawnsArrive __instance)
         {
             var rm = XenoDirectorGameComponent.GetRestrictions();
-            if (rm != null && rm.BlocksQuestPawnRewards)
+            if (rm != null && rm.BlocksQuestPawnRewards && __instance.joinPlayer)
             {
-                // Cancela o spawn de pawn vindo de quest
                 return false;
             }
             return true;

@@ -1,7 +1,9 @@
-// Helper para evitar warnings de referência circular / facilitar testes unitários futuros.
-// Em produção usar Verse.Current normalmente.
+using Verse;
 
 namespace XenoDirector
 {
-    // Placeholder – o código real usa Verse.Current.Game
+    public static class Current
+    {
+        public static Game Game => Verse.Current.Game;
+    }
 }

@@ -179,7 +179,14 @@ namespace XenoDirector
             return false;
         }
 
-        public bool HasForcedIncidents => (EnsureCache(), _forcedDefNames.Count > 0 || _forcedTags.Count > 0).Item2;
+        public bool HasForcedIncidents
+        {
+            get
+            {
+                EnsureCache();
+                return _forcedDefNames.Count > 0 || _forcedTags.Count > 0;
+            }
+        }
 
         public IEnumerable<string> GetForcedDefNames()
         {

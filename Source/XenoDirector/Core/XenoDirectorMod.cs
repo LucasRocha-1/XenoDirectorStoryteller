@@ -55,7 +55,7 @@ namespace XenoDirector
             Scribe_Values.Look(ref MenaceDecayMultiplier, "MenaceDecayMultiplier", 1f);
             Scribe_Values.Look(ref HistoryRetentionDays, "HistoryRetentionDays", 60);
 
-            PermanentMicroBrainCount = Math.Clamp(PermanentMicroBrainCount, 1, XenoDirectorMod.AbsoluteMaxMicroBrains);
+            PermanentMicroBrainCount = Math.Max(1, Math.Min(PermanentMicroBrainCount, XenoDirectorMod.AbsoluteMaxMicroBrains));
         }
 
         public void DoWindowContents(UnityEngine.Rect inRect)
