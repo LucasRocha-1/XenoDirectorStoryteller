@@ -1,4 +1,4 @@
-# XenoDirector Storyteller – Skeleton
+# XenoDirector Storyteller
 
 Storyteller mod para RimWorld inspirado na arquitetura de **dois cérebros** do Xenomorfo de *Alien: Isolation*:
 
@@ -73,13 +73,6 @@ Register(new StoryRestriction {
 
 Depois basta `rm.Activate("MechOnly")`.
 
-## Compilação
-
-1. Ajuste os caminhos `RimWorldDir` e `HarmonyDir` no `.csproj`.
-2. `dotnet build -c Release`
-3. Copie o DLL para `Assemblies/` dentro da pasta do mod.
-4. Harmony deve carregar antes.
-
 ---
 
-Skeleton criado para servir de base sólida. O Director nunca “cheata” – ele apenas aponta e filtra. Os micro-cérebros agem com base no que sentem + nas dicas + nas **restrições ativas**. O jogador define as regras da história; o storyteller obedece e adapta.
+O Director nunca cheata – ele apenas aponta e filtra. Os micro-cérebros agem com base no que sentem + nas dicas + nas **restrições ativas**. O jogador define as regras da história; o storyteller obedece e adapta.
