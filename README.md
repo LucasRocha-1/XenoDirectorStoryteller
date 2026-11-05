@@ -1,78 +1,91 @@
 # XenoDirector Storyteller
 
-Storyteller mod para RimWorld inspirado na arquitetura de **dois cérebros** do Xenomorfo de *Alien: Isolation*:
+Storyteller + otimização + **orquestração narrativa profunda** para RimWorld.
 
-| Cérebro | Papel | Equivalente Isolation |
-|---------|-------|-----------------------|
-| **DirectorBrain** (Macro) | Omnisciente, controla pacing / menace gauge, decide quando spawnar micro-cérebros temporários, orquestra propostas e **reage a restrições** | Director AI |
-| **MicroBrain** (N instâncias) | Decisões locais por especialidade (Combat, Narrative, Economy, Social, Anomaly, CrossMod…) | Alien behaviour tree + sensors |
+Inspirado na IA dual do Xenomorfo de *Alien: Isolation* (Director + micro-cérebros).
 
-## Sistema de Restrições (novo)
+## O que funciona SEM ser o storyteller selecionado
 
-O jogador pode ativar restrições narrativas. O storyteller **reage imediatamente**:
+| Sistema | Setting | Efeito |
+|---------|---------|--------|
+| **Optimization layer** | Enable optimization layer | Scheduler cooperativo, hibernação de sistemas frios |
+| **Advanced performance** | Enable advanced performance (**opt-in**) | Throttle de pawns distantes, soft GC, world-pawn pressure |
+| **Restrictions** | Restrictions always active | Single / Zombie Apocalypse / Nature's Wrath via Harmony |
+| **Narrative arcs** | Enable narrative arcs | Cadeias pós-resgate, etc. |
+| **Quest mutation** | Enable quest mutation | Varia quests vanilla |
+| **Global story events** | Enable global story events | Secas regionais, pandemias, guerras por migração |
 
-| Restrição | Efeito |
-|-----------|--------|
-| **Single** | Desabilita todas as formas de ganhar novos personagens (wanderers, refugees, quest pawn rewards, recruit incidents). Social micro-brain para de propor joins. |
-| **Zombie Apocalypse** | Força eventos de Anomaly (DeathPall, ShamblerSwarm, etc.). Todas as raids futuras são filtradas para apenas PawnKinds classificados como Undead/Shambler/Zombie de **qualquer mod** ativo. Spawna micro-brain Anomaly temporário. |
-| **Nature's Wrath** | Coleta desastres naturais de **todos** os mods carregados e dispara em sequência cíclica. Spawna micro-brain CrossMod temporário. |
-
-### Como funciona internamente
-
-1. `StoryRestriction` — dados declarativos (tags bloqueadas/forçadas, AllowedRaidTags, flags).
-2. `RestrictionManager` — cache de regras ativas, API `IsIncidentBlocked` / `IsIncidentForced` / `IsRaidPawnKindAllowed` / `ForcesNaturalDisasterSequence`.
-3. Director + MicroBrains consultam o manager em `ProposeIncident`.
-4. `StorytellerComp_XenoDirector` aplica o filtro final antes de `yield return`.
-5. Harmony patches:
-   - `IncidentWorker.CanFireNow` → bloqueia o que passou pelo storyteller vanilla.
-   - `PawnGroupMaker.GeneratePawns` → filtra options para só Undead.
-   - `QuestPart_SpawnPawn` + `IncidentWorker_WandererJoin` → Single.
-
-O mod aparece em **Options → Mod settings** quando está ativo. O storyteller **XenoDirector** fica disponível na tela de seleção de storytellers.
-
-Ativação de restrições: **Mod Settings** (com save aberto) ou via código `RestrictionManager.Activate("Single")`.
-
-## Objetivos do esqueleto
-
-1. **Detecção de reação do jogador** — `PlayerReactionProfile` + classificação de estilo.
-2. **Número escalável de cérebros** — permanente (settings) + temporário (runtime).
-3. **Otimização para saves longos + muitos mods** — history bounded, tick throttling, catálogo lazy.
-4. **Coordenação multi-mod** — `ModIncidentCatalog` indexa IncidentDefs de todos os mods.
-5. **Restrições reativas** — o storyteller muda comportamento de acordo com as regras ativas.
-
-## Estrutura de pastas
-
-```
-XenoDirectorStoryteller/
-├── About/ + Defs/ + Languages/
-├── Source/XenoDirector/
-│   ├── Core/                  # Mod, GameComponent, StorytellerComp
-│   ├── Brains/                # IBrain, DirectorBrain, MicroBrain, BrainFactory
-│   ├── Restrictions/          # StoryRestriction, RestrictionManager  ← NOVO
-│   ├── PlayerAnalysis/        # Perfil + observador de reações
-│   ├── ModCoordination/       # Catálogo cross-mod
-│   ├── Optimization/          # Guards de performance
-│   ├── HarmonyPatches/        # Observação + RestrictionPatches
-│   └── Utils/
-└── README.md
-```
-
-## Como adicionar uma nova restrição
-
-```csharp
-// Em RestrictionManager.EnsureRegistry() ou via Def futuro:
-Register(new StoryRestriction {
-    Id = "MechOnly",
-    Label = "Mechanoid Hell",
-    AllowedRaidTags = { "Mechanoid" },
-    ForcedIncidentTags = { "Mechanoid" },
-    MenaceBias = 0.2f,
-    Priority = 75
-});
-```
-
-Depois basta `rm.Activate("MechOnly")`.
+Com **XenoDirector** selecionado, além disso entram Director + micro-cérebros + menace gauge completa.
 
 ---
 
-O Director nunca cheata – ele apenas aponta e filtra. Os micro-cérebros agem com base no que sentem + nas dicas + nas **restrições ativas**. O jogador define as regras da história; o storyteller obedece e adapta.
+## Performance avançada (opt-in)
+
+Desligada por padrão. O jogador ativa em **Options → Mod settings**:
+
+- **Dynamic entity throttling** — pula ticks de animais/NPCs distantes (nunca colonos do jogador nem hostis perto da câmera)
+- **World pawn soft cap monitoring**
+- **Periodic soft GC hint** (~3 dias de jogo)
+
+Estilo “otimizador ativo” (ideia similar a mods de Minecraft), adaptado ao pipeline single-thread do RimWorld.
+
+---
+
+## Orquestração narrativa (acesso interno)
+
+`NarrativeWorldAccess` + `StoryArcManager` ligam-se a:
+
+- `IncidentWorker` / raids / letters  
+- `QuestManager` (mutação de quests)  
+- `Faction` goodwill / settlements  
+- `WorldGrid` / tiles (seca → migração → tensão)  
+- Biotech **xenotypes** (caçadores após resgate)  
+- Ideology **memes** (respostas à pandemia: genética, árvores sagradas, void/dor…)
+
+### Exemplo: resgate → cadeia
+
+1. Recrutamento de pawn de outra facção → `StartRescueChain`  
+2. Caçadores de xenotype (Biotech)  
+3. Tentativa de assassinato  
+4. Oferta de escolta de retorno  
+5. Emboscada  
+6. Raid ligada à facção de origem  
+
+### Exemplo: seca global
+
+1. Condição de seca/calor na região  
+2. Migração marcada de settlements  
+3. Hostilidade entre facções deslocadas  
+
+### Exemplo: pandemia
+
+1. Outbreak de doença misteriosa nos colonos  
+2. Cada facção reage segundo ideologia (genes / Anima-Gauranlen-Polux / void)  
+
+DevMode: botões no settings para disparar seca e pandemia de teste.
+
+---
+
+## Estrutura Source
+
+```
+Core/           Mod, GameComponent, StorytellerComp
+Brains/         Director + Micro (storyteller)
+Restrictions/   RestrictionManager (sempre aplicável)
+Narrative/Arcs/ StoryArc + StoryArcManager
+Access/         NarrativeWorldAccess (ponte para APIs do jogo)
+Optimization/   Scheduler, Opt brains, AdvancedPerformanceController
+HarmonyPatches/ Restrictions, Narrative sync, Advanced tick throttle
+```
+
+---
+
+## Compilação
+
+Ajuste caminhos RimWorld/Harmony no `.csproj`, `dotnet build -c Release`, copie DLL para `Assemblies/`.
+
+Harmony deve carregar antes deste mod.
+
+---
+
+O Director não cheata: aponta, filtra e sincroniza. Restrições e arcos obedecem às settings mesmo com Cassandra no comando. Performance agressiva só com consentimento explícito do jogador.

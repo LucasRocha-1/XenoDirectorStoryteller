@@ -7,19 +7,29 @@ using Verse;
 namespace XenoDirector
 {
     /// <summary>
-    /// Patches que fazem as restrições realmente afetarem o jogo:
-    /// - Bloqueio de recrutamento / wanderers / refugees (Single)
-    /// - Filtro de PawnKind em raids para apenas Undead (Zombie Apocalypse)
-    /// - Bloqueio de incidentes no CanFireNow (rede de segurança)
+    /// Patches de restrições — ativos com qualquer storyteller quando
+    /// Settings.EnableRestrictionsAlways (default true).
     /// </summary>
+    public static class RestrictionPatchGate
+    {
+        public static bool RestrictionsLive
+        {
+            get
+            {
+                if (XenoDirectorMod.Settings == null) return true;
+                return XenoDirectorMod.Settings.EnableRestrictionsAlways
+                    || XenoDirectorGameComponent.IsXenoStorytellerActive();
+            }
+        }
+    }
 
-    // ---------- Bloqueia incidentes de recrutamento no CanFireNow ----------
     [HarmonyPatch(typeof(IncidentWorker), nameof(IncidentWorker.CanFireNow))]
     public static class Patch_IncidentWorker_CanFireNow
     {
         public static void Postfix(IncidentWorker __instance, IncidentParms parms, ref bool __result)
         {
             if (!__result) return;
+            if (!RestrictionPatchGate.RestrictionsLive) return;
 
             var rm = XenoDirectorGameComponent.GetRestrictions();
             if (rm == null) return;
@@ -39,6 +49,7 @@ namespace XenoDirector
         public static void Prefix(PawnGroupMakerParms parms, ref bool __state)
         {
             __state = false;
+            if (!RestrictionPatchGate.RestrictionsLive) return;
             var rm = XenoDirectorGameComponent.GetRestrictions();
             if (rm == null || !rm.RestrictsRaids) return;
 
@@ -70,8 +81,9 @@ namespace XenoDirector
     {
         public static bool Prefix(PawnGroupMaker __instance, PawnGroupMakerParms parms, bool errorOnZeroResults, ref IEnumerable<Pawn> __result)
         {
+            if (!RestrictionPatchGate.RestrictionsLive) return true;
             var rm = XenoDirectorGameComponent.GetRestrictions();
-            if (rm == null || !rm.RestrictsRaids) return true; // deixa o original rodar
+            if (rm == null || !rm.RestrictsRaids) return true;
 
             // Coleta options permitidas
             var allowedOptions = new List<PawnGenOption>();
@@ -111,16 +123,15 @@ namespace XenoDirector
     }
 
     // ---------- Bloqueia recompensas de quest que adicionam pawns (Single) ----------
-    [HarmonyPatch(typeof(QuestPart_PawnsArrive), nameof(QuestPart_PawnsArrive.Notify_QuestSignalReceived))]
-    public static class Patch_QuestPart_PawnsArrive
+    [HarmonyPatch(typeof(QuestPart_SpawnPawn), "Notify_QuestSignalReceived")]
+    public static class Patch_QuestPart_SpawnPawn
     {
-        public static bool Prefix(QuestPart_PawnsArrive __instance)
+        public static bool Prefix()
         {
+            if (!RestrictionPatchGate.RestrictionsLive) return true;
             var rm = XenoDirectorGameComponent.GetRestrictions();
-            if (rm != null && rm.BlocksQuestPawnRewards && __instance.joinPlayer)
-            {
+            if (rm != null && rm.BlocksQuestPawnRewards)
                 return false;
-            }
             return true;
         }
     }
@@ -140,6 +151,7 @@ namespace XenoDirector
         public static void Postfix(ref bool __result)
         {
             if (!__result) return;
+            if (!RestrictionPatchGate.RestrictionsLive) return;
             var rm = XenoDirectorGameComponent.GetRestrictions();
             if (rm != null && rm.BlocksRecruitment)
                 __result = false;

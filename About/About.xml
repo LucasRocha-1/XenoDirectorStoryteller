@@ -21,6 +21,11 @@ Recursos do esqueleto:
 - Leitura e coordenação de IncidentDefs / QuestScripts de múltiplos mods simultaneamente para criar arcos narrativos coerentes.
 
 Base técnica alinhada com Engenharia de Software + IA Aplicada (pré-processamento de estado da colônia, classificação de estilo de jogador, clusterização de eventos, regressão de tensão).
+
+Camada de OTIMIZAÇÃO sempre ativa (mesmo sem ser o storyteller selecionado):
+- Múltiplos cérebros de otimização observam calor de subsistemas (combate, colonos, wildlife, world pawns, catálogos).
+- Sistemas frios vão para Background/Hibernating e só são verificados de tempos em tempos.
+- Scheduler cooperativo com orçamento de ms + fila thread-safe só para computação pura.
   </description>
   <modDependencies>
     <li>
