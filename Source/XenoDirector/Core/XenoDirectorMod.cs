@@ -78,9 +78,14 @@ namespace XenoDirector
             Scribe_Values.Look(ref AdvDistantPawnTickInterval, "AdvDistantPawnTickInterval", 4);
             Scribe_Values.Look(ref AdvWorldPawnSoftCap, "AdvWorldPawnSoftCap", 250);
 
-            PermanentMicroBrainCount = Math.Clamp(PermanentMicroBrainCount, 1, XenoDirectorMod.AbsoluteMaxMicroBrains);
-            AdvDistantPawnTickInterval = Math.Clamp(AdvDistantPawnTickInterval, 2, 30);
-            AdvWorldPawnSoftCap = Math.Clamp(AdvWorldPawnSoftCap, 50, 2000);
+            PermanentMicroBrainCount = Clamp(PermanentMicroBrainCount, 1, XenoDirectorMod.AbsoluteMaxMicroBrains);
+            AdvDistantPawnTickInterval = Clamp(AdvDistantPawnTickInterval, 2, 30);
+            AdvWorldPawnSoftCap = Clamp(AdvWorldPawnSoftCap, 50, 2000);
+        }
+
+        private static int Clamp(int value, int min, int max)
+        {
+            return Math.Max(min, Math.Min(max, value));
         }
 
         public void DoWindowContents(Rect inRect)

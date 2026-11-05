@@ -23,25 +23,47 @@ namespace XenoDirector
 
         public bool TryFireXenotypeHunterRaid(StoryArc arc)
         {
-            if (string.IsNullOrEmpty(arc.AnchorXenotypeDefName)) return false;
-            if (!ModsConfig.BiotechActive) return false;
+            if (arc == null) return false;
+            if (!ModsConfig.BiotechActive || !ModsConfig.IdeologyActive) return true;
 
             var map = Find.AnyPlayerHomeMap;
             if (map == null) return false;
 
-            // Facção hostil qualquer; preferência por quem odeia o xenotipo (esqueleto)
-            var faction = Find.FactionManager.RandomEnemyFaction(allowHidden: false, allowDefeated: false, allowNonHumanlike: false);
-            if (faction == null) return false;
+            var targetPawn = ResolveAnchorPawn(arc);
+            if (targetPawn == null) return false;
+
+            var xenotypeNames = IdeologyXenotypeMatcher.GetPawnXenotypeNames(targetPawn).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (xenotypeNames.Count == 0) return true;
+
+            var matchingFactions = new List<(Faction Faction, string IdeologyName)>();
+            foreach (var faction in Find.FactionManager?.AllFactionsVisible ?? Enumerable.Empty<Faction>())
+            {
+                if (faction == null || faction.IsPlayer || faction.defeated || !faction.HostileTo(Faction.OfPlayer))
+                    continue;
+
+                foreach (var ideology in IdeologyXenotypeMatcher.GetIdeologies(faction.ideos))
+                {
+                    if (!IdeologyXenotypeMatcher.IsHatedByAnyIdeo(new[] { ideology }, xenotypeNames))
+                        continue;
+
+                    matchingFactions.Add((faction, GetIdeologyLabel(ideology)));
+                }
+            }
+
+            if (matchingFactions.Count == 0) return true;
+
+            var selected = matchingFactions[Rand.Range(0, matchingFactions.Count)];
+            var factionToSend = selected.Faction;
 
             var parms = new IncidentParms
             {
                 target = map,
-                faction = faction,
+                faction = factionToSend,
                 points = StorytellerUtility.DefaultThreatPointsNow(map) * 0.7f,
                 raidStrategy = RaidStrategyDefOf.ImmediateAttack,
                 raidArrivalMode = PawnsArrivalModeDefOf.EdgeWalkIn,
                 customLetterLabel = "Xenotype hunters",
-                customLetterText = $"Hunters seek those with the {arc.AnchorXenotypeDefName} xenotype after your recent rescue."
+                customLetterText = $"{factionToSend.Name} ({selected.IdeologyName}) sends hunters seeking {targetPawn.LabelShort}, whose xenotype matches their ideology's hatred."
             };
 
             var def = DefDatabase<IncidentDef>.GetNamedSilentFail("RaidEnemy") ?? IncidentDefOf.RaidEnemy;
@@ -75,28 +97,71 @@ namespace XenoDirector
 
         public bool TryOfferReturnEscortQuest(StoryArc arc)
         {
-            // Esqueleto: letter + marca flag; em produção geraria QuestScript custom
+            if (arc == null) return false;
             var target = ResolveAnchorPawn(arc);
-            string name = target?.LabelShort ?? "the rescued";
-            Find.LetterStack.ReceiveLetter(
-                "Return escort",
-                $"An opportunity arises to return {name} under escort. Travel may not be safe.",
-                LetterDefOf.NeutralEvent);
+            var quest = RescueEventFactory.Instance.CreateMission(arc);
+
+            if (quest != null)
+            {
+                Find.QuestManager.Add(quest);
+            }
+            else
+            {
+                string name = target?.LabelShort ?? "the rescued";
+                Find.LetterStack.ReceiveLetter(
+                    "Return escort",
+                    $"No compatible quest script could be generated for {name}. The escort opportunity remains open.",
+                    LetterDefOf.NeutralEvent);
+            }
+
             arc.Flags["returnEscortOffered"] = "1";
             return true;
         }
 
         public bool TryScheduleAmbush(StoryArc arc)
         {
-            if (!arc.Flags.ContainsKey("returnEscortOffered")) return false;
+            if (arc?.Flags == null || !arc.Flags.ContainsKey("returnEscortOffered")) return false;
+            var plan = RescueEventFactory.Instance.CreateEvent(arc);
+            return plan?.Kind == RescueEventKind.RivalAmbush && TryExecuteRescueRaid(plan);
+        }
+
+        public bool TryRunNextRescueEvent(StoryArc arc)
+        {
+            var plan = RescueEventFactory.Instance.CreateEvent(arc);
+            if (plan == null) return false;
+
+            if (plan.Kind == RescueEventKind.ReturnEscort)
+                return TryOfferReturnEscortQuest(arc);
+
+            if (plan.Kind == RescueEventKind.RouteDisruption)
+            {
+                Find.LetterStack.ReceiveLetter(
+                    plan.LetterLabel,
+                    plan.LetterText,
+                    LetterDefOf.NegativeEvent);
+                return true;
+            }
+
+            return TryExecuteRescueRaid(plan);
+        }
+
+        private static bool TryExecuteRescueRaid(RescueEventPlan plan)
+        {
             var map = Find.AnyPlayerHomeMap;
-            if (map == null) return false;
+            if (map == null || plan.Faction == null || !plan.Faction.HostileTo(Faction.OfPlayer))
+                return false;
+
+            var raid = DefDatabase<IncidentDef>.GetNamedSilentFail("RaidEnemy") ?? IncidentDefOf.RaidEnemy;
+            if (raid == null) return false;
 
             var parms = StorytellerUtility.DefaultParmsNow(IncidentCategoryDefOf.ThreatBig, map);
+            parms.faction = plan.Faction;
             parms.points *= 0.6f;
-            parms.customLetterLabel = "Ambush";
-            parms.customLetterText = "The escort route was compromised.";
-            return IncidentDefOf.RaidEnemy.Worker.TryExecute(parms);
+            parms.raidStrategy = RaidStrategyDefOf.ImmediateAttack;
+            parms.raidArrivalMode = PawnsArrivalModeDefOf.EdgeWalkIn;
+            parms.customLetterLabel = plan.LetterLabel;
+            parms.customLetterText = plan.LetterText;
+            return raid.Worker.TryExecute(parms);
         }
 
         public bool TryLinkedFactionRaid(StoryArc arc)
@@ -141,7 +206,7 @@ namespace XenoDirector
         {
             // Esqueleto: marca relações e letter. Migração real de settlement exige
             // WorldObject manipulação cuidadosa (destroy + create) — feito de forma segura.
-            int moved = 0;
+            var migrationPlans = new List<string>();
             foreach (var fid in arc.InvolvedFactionIds.ToList())
             {
                 var faction = ResolveFactionByLoadId(fid);
@@ -163,21 +228,20 @@ namespace XenoDirector
 
                 if (newTile != settlement.Tile)
                 {
-                    // Não destruímos settlements vanilla à toa em esqueleto —
-                    // registramos intenção e letter (implementação completa: relocate API)
                     arc.Flags["migrated_" + fid] = newTile.ToString();
-                    moved++;
+                    migrationPlans.Add($"{faction.Name}: tile {settlement.Tile} -> {newTile}");
                 }
             }
 
-            if (moved > 0)
+            if (migrationPlans.Count > 0)
             {
                 Find.LetterStack.ReceiveLetter(
-                    "Faction migration",
-                    $"{moved} faction(s) are abandoning drought-stricken lands.",
+                    "Faction migration plans",
+                    "Nearby factions are considering leaving drought-stricken lands:\n"
+                    + string.Join("\n", migrationPlans),
                     LetterDefOf.NeutralEvent);
             }
-            return moved > 0 || arc.InvolvedFactionIds.Count == 0;
+            return migrationPlans.Count > 0 || arc.InvolvedFactionIds.Count == 0;
         }
 
         private readonly List<int> _neighborBuffer = new List<int>();
@@ -304,6 +368,24 @@ namespace XenoDirector
             return text;
         }
 
+        private static string GetIdeologyLabel(object ideology)
+        {
+            var type = ideology.GetType();
+            var name = type.GetProperty("name");
+            try
+            {
+                var propertyValue = name?.GetValue(ideology, null) as string;
+                if (!string.IsNullOrWhiteSpace(propertyValue)) return propertyValue;
+                var fieldValue = type.GetField("name")?.GetValue(ideology) as string;
+                if (!string.IsNullOrWhiteSpace(fieldValue)) return fieldValue;
+            }
+            catch (Exception exception)
+            {
+                Log.Warning($"[XenoDirector.Ideology] Could not read ideology name: {exception.Message}");
+            }
+            return type.Name;
+        }
+
         // ---------- Helpers ----------
 
         public Pawn ResolveAnchorPawn(StoryArc arc)
@@ -337,19 +419,11 @@ namespace XenoDirector
             if (quest == null || !XenoDirectorMod.Settings.EnableQuestMutation) return;
             if (quest.State != QuestState.Ongoing) return;
 
-            // Marca para não mutar duas vezes
-            string key = "xd_mutated_" + quest.id;
-            // Quest não tem dictionary livre; usamos name prefix
             if (quest.name != null && quest.name.StartsWith("[XD] ")) return;
 
             quest.name = "[XD] " + (quest.name ?? "Quest");
-            // Estende ou reduz ticks restantes se existir
-            try
-            {
-                if (quest.TicksUntilExpiry > 0)
-                    quest.TicksUntilExpiry = (int)(quest.TicksUntilExpiry * Rand.Range(0.75f, 1.4f));
-            }
-            catch { }
+            if (quest.TicksUntilExpiry > 0)
+                quest.TicksUntilExpiry = Math.Max(1, (int)(quest.TicksUntilExpiry * Rand.Range(0.75f, 1.4f)));
 
             PerformanceGuards.ReportActivity(GameSubsystemId.QuestManager);
         }

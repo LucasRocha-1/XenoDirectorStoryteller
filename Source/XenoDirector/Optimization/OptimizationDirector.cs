@@ -48,7 +48,7 @@ namespace XenoDirector
         /// </summary>
         public void Tick(XenoDirectorGameComponent gc)
         {
-            if (!enabled) return;
+            if (!Enabled) return;
             if (XenoDirectorMod.Settings != null && !XenoDirectorMod.Settings.EnableOptimizationLayer)
                 return;
 

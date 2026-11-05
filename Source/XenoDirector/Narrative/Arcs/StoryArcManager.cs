@@ -21,8 +21,14 @@ namespace XenoDirector
 
         public void ExposeData()
         {
+            if (Scribe.mode == LoadSaveMode.Saving)
+                ClearRescueEventQueues();
+
             Scribe_Collections.Look(ref _arcs, "Arcs", LookMode.Deep);
             if (_arcs == null) _arcs = new List<StoryArc>();
+
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+                ClearRescueEventQueues();
         }
 
         public void Tick(XenoDirectorGameComponent gc)
@@ -49,14 +55,9 @@ namespace XenoDirector
         {
             if (rescued == null) return null;
 
-            string xeno = null;
-            try
-            {
-                // Biotech
-                if (ModsConfig.BiotechActive && rescued.genes?.Xenotype != null)
-                    xeno = rescued.genes.Xenotype.defName;
-            }
-            catch { /* biotech ausente */ }
+            string xeno = ModsConfig.BiotechActive
+                ? IdeologyXenotypeMatcher.GetPawnXenotypeNames(rescued).FirstOrDefault()
+                : null;
 
             var arc = new StoryArc
             {
@@ -69,14 +70,7 @@ namespace XenoDirector
                 AnchorPawnLoadId = rescued.GetUniqueLoadID(),
                 AnchorFactionId = fromFaction?.def?.defName,
                 AnchorXenotypeDefName = xeno,
-                PendingEventTags = new List<string>
-                {
-                    "XenotypeHunters",
-                    "AssassinationAttempt",
-                    "ReturnEscort",
-                    "AmbushOnReturn",
-                    "FactionRaidLinked"
-                }
+                PendingEventTags = new List<string>()
             };
 
             if (fromFaction != null)
@@ -158,6 +152,12 @@ namespace XenoDirector
 
         private void PulseArc(StoryArc arc, XenoDirectorGameComponent gc)
         {
+            if (arc.ArcType == "RescueChain")
+            {
+                PulseRescueArc(arc, gc);
+                return;
+            }
+
             if (arc.PendingEventTags == null || arc.PendingEventTags.Count == 0)
             {
                 arc.Completed = true;
@@ -223,6 +223,39 @@ namespace XenoDirector
             }
 
             gc.OptDirector?.NotifyActivity(GameSubsystemId.Incidents);
+        }
+
+        private void PulseRescueArc(StoryArc arc, XenoDirectorGameComponent gc)
+        {
+            if (arc.CurrentStep >= arc.TotalSteps)
+            {
+                arc.Completed = true;
+                return;
+            }
+
+            if (!CanRunNextStep(arc)) return;
+
+            arc.Flags["lastStepTick"] = Find.TickManager.TicksGame.ToString();
+            if (NarrativeWorldAccess.Instance.TryRunNextRescueEvent(arc))
+                arc.Advance();
+
+            gc.OptDirector?.NotifyActivity(GameSubsystemId.Incidents);
+        }
+
+        private static bool CanRunNextStep(StoryArc arc)
+        {
+            const int minGap = 60000 * 2;
+            return !arc.Flags.TryGetValue("lastStepTick", out var lastStr)
+                || !int.TryParse(lastStr, out var last)
+                || Find.TickManager.TicksGame - last >= minGap;
+        }
+
+        private void ClearRescueEventQueues()
+        {
+            if (_arcs == null) return;
+            foreach (var arc in _arcs)
+                if (arc?.ArcType == "RescueChain")
+                    arc.PendingEventTags?.Clear();
         }
     }
 }

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\Source\XenoDirector\HarmonyPatches\RestrictionPatches.cs"
+             Link="RestrictionPatches.cs" />
+    <Compile Include="..\..\Source\XenoDirector\Narrative\IdeologyXenotypeMatcher.cs"
+             Link="IdeologyXenotypeMatcher.cs" />
+    <Compile Include="..\..\Source\XenoDirector\Narrative\QuestFabricator.cs"
+             Link="QuestFabricator.cs" />
+  </ItemGroup>
+</Project>

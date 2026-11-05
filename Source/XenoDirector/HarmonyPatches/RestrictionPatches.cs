@@ -42,83 +42,61 @@ namespace XenoDirector
         }
     }
 
-    // ---------- Filtra PawnKinds de raid para apenas Undead quando restrição ativa ----------
-    [HarmonyPatch(typeof(PawnGroupMakerUtility), nameof(PawnGroupMakerUtility.GeneratePawns))]
-    public static class Patch_PawnGroupMaker_GeneratePawns
-    {
-        public static void Prefix(PawnGroupMakerParms parms, ref bool __state)
-        {
-            __state = false;
-            if (!RestrictionPatchGate.RestrictionsLive) return;
-            var rm = XenoDirectorGameComponent.GetRestrictions();
-            if (rm == null || !rm.RestrictsRaids) return;
-
-            // Só interfere em raids de inimigos
-            if (parms?.groupKind == null) return;
-            if (parms.groupKind != PawnGroupKindDefOf.Combat && parms.groupKind != PawnGroupKindDefOf.Settlement)
-                return;
-
-            __state = true;
-        }
-
-        // Postfix não consegue filtrar facilmente a lista gerada (é IEnumerable lazy).
-        // Abordagem mais robusta: patch em GeneratePawnKinds e filtrar opções.
-    }
-
-    /// <summary>
-    /// Filtra as opções de PawnKind antes da geração do grupo.
-    /// Quando Zombie Apocalypse (ou similar) está ativo, só permite kinds que passem em IsRaidPawnKindAllowed.
-    /// </summary>
-    [HarmonyPatch(typeof(PawnGroupMakerUtility), "GeneratePawnKindsExample")]
-    public static class Patch_GeneratePawnKindsExample
-    {
-        // Fallback: se o método existir em versões futuras; o patch principal está abaixo.
-    }
-
-    // Patch mais estável: filtra a lista de PawnGenOptions dentro do PawnGroupMaker
+    // Filtra as opções em uma janela curta e restaura a lista mesmo se a geração falhar.
     [HarmonyPatch(typeof(PawnGroupMaker), nameof(PawnGroupMaker.GeneratePawns))]
     public static class Patch_PawnGroupMaker_Instance_GeneratePawns
     {
-        public static bool Prefix(PawnGroupMaker __instance, PawnGroupMakerParms parms, bool errorOnZeroResults, ref IEnumerable<Pawn> __result)
+        public static bool Prefix(
+            PawnGroupMaker __instance,
+            PawnGroupMakerParms parms,
+            ref IEnumerable<Pawn> __result,
+            ref List<PawnGenOption> __state)
         {
+            __state = null;
             if (!RestrictionPatchGate.RestrictionsLive) return true;
             var rm = XenoDirectorGameComponent.GetRestrictions();
             if (rm == null || !rm.RestrictsRaids) return true;
+            if (parms?.groupKind != PawnGroupKindDefOf.Combat
+                && parms?.groupKind != PawnGroupKindDefOf.Settlement)
+                return true;
 
-            // Coleta options permitidas
+            var originalOptions = __instance.options;
+            if (originalOptions == null) return true;
+
             var allowedOptions = new List<PawnGenOption>();
-            if (__instance.options != null)
+            foreach (var opt in originalOptions)
             {
-                foreach (var opt in __instance.options)
-                {
-                    if (opt?.kind != null && rm.IsRaidPawnKindAllowed(opt.kind))
-                        allowedOptions.Add(opt);
-                }
+                if (opt?.kind != null && rm.IsRaidPawnKindAllowed(opt.kind))
+                    allowedOptions.Add(opt);
             }
 
             if (allowedOptions.Count == 0)
             {
-                // Nenhum undead disponível neste maker → cancela a geração deste grupo
-                // (outro maker/faction pode ter undead)
                 __result = Enumerable.Empty<Pawn>();
                 return false;
             }
 
-            // Substitui temporariamente as options (não ideal, mas funciona no esqueleto)
-            // Em produção: criar um PawnGroupMaker clone com options filtradas.
-            var original = __instance.options;
+            if (allowedOptions.Count == originalOptions.Count) return true;
+
+            __state = originalOptions;
             __instance.options = allowedOptions;
-            // Deixa o método original rodar com options filtradas
-            // (Harmony Prefix return true continua para o original)
-            // Como já alteramos a lista, o original usará só undead.
-            // Restauramos no Finalizer.
             return true;
         }
 
-        public static void Finalizer(PawnGroupMaker __instance, List<PawnGenOption> __state)
+        public static void Postfix(ref IEnumerable<Pawn> __result, List<PawnGenOption> __state)
         {
-            // Restauração seria necessária se guardássemos state; no esqueleto
-            // a alteração é aceitável porque options são re-lidas de Defs no próximo uso.
+            if (__state != null && __result != null)
+                __result = __result.ToList();
+        }
+
+        public static System.Exception Finalizer(
+            PawnGroupMaker __instance,
+            List<PawnGenOption> __state,
+            System.Exception __exception)
+        {
+            if (__state != null)
+                __instance.options = __state;
+            return __exception;
         }
     }
 
