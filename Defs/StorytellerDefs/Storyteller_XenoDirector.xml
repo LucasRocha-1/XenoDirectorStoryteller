@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Defs>
   <!-- Storyteller principal. O "corpo" que usa os cérebros. -->
-  <StorytellerDef>
+  <StorytellerDef ParentName="BaseStoryteller">
     <defName>XenoDirector</defName>
     <label>XenoDirector</label>
     <description>Director omnisciente + múltiplos micro-cérebros. Inspirado no Xenomorfo de Alien: Isolation. Observa reações do jogador e coordena eventos de vários mods como uma narrativa coerente.</description>
@@ -11,8 +11,6 @@
     <comps>
       <!-- Comp principal do sistema de cérebros -->
       <li Class="XenoDirector.StorytellerCompProperties_XenoDirector">
-        <category>Misc</category>
-        <minDaysPassed>0</minDaysPassed>
         <!-- Configuração base de cérebros (pode ser sobrescrita em runtime) -->
         <baseMicroBrainCount>2</baseMicroBrainCount>
         <maxMicroBrainCount>8</maxMicroBrainCount>
@@ -26,13 +24,15 @@
         <onDays>1.5</onDays>
         <offDays>3.5</offDays>
         <numIncidentsRange>1</numIncidentsRange>
-        <forceRaidEnemy>true</forceRaidEnemy>
+        <forceRaidEnemyBeforeDaysPassed>20</forceRaidEnemyBeforeDaysPassed>
       </li>
       <li Class="StorytellerCompProperties_RandomMain">
-        <category>Misc</category>
         <minDaysPassed>0</minDaysPassed>
         <mtbDays>4</mtbDays>
         <maxThreatBigIntervalDays>15</maxThreatBigIntervalDays>
+        <categoryWeights>
+          <Misc>1</Misc>
+        </categoryWeights>
       </li>
     </comps>
   </StorytellerDef>

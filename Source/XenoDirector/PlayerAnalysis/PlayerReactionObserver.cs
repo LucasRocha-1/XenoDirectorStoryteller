@@ -20,7 +20,7 @@ namespace XenoDirector
 
             // Snapshot leve (não faz loops pesados)
             float wealthBefore = result.WealthBefore; // preenchido pelo patch
-            float wealthAfter = WealthWatcher.GetTotalWealth(map); // ou cache
+            float wealthAfter = map.PlayerWealthForStoryteller;
             int deaths = result.ColonistDeathsDuringEvent;
 
             var sample = new ReactionSample

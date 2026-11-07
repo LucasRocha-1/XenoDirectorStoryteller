@@ -5,6 +5,6 @@ namespace XenoDirector
 {
     public static class Current
     {
-        public static Game Game => Verse.Current.Game;
+        public static Verse.Game Game => Verse.Current.Game;
     }
 }

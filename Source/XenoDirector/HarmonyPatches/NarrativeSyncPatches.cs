@@ -27,7 +27,8 @@ namespace XenoDirector
     /// Quando um prisioneiro/refugiado é "resgatado" (recrutado de facção),
     /// inicia arco RescueChain se arcos estão habilitados.
     /// </summary>
-    [HarmonyPatch(typeof(InteractionWorker_RecruitAttempt), nameof(InteractionWorker_RecruitAttempt.DoRecruit))]
+    [HarmonyPatch(typeof(InteractionWorker_RecruitAttempt), nameof(InteractionWorker_RecruitAttempt.DoRecruit),
+        new[] { typeof(Pawn), typeof(Pawn), typeof(bool) })]
     public static class Patch_DoRecruit_StartArc
     {
         // Assinatura varia entre versões; usamos overload comum
@@ -52,20 +53,4 @@ namespace XenoDirector
         }
     }
 
-    // Fallback se DoRecruit signature for diferente — patch genérico em RecruitUtility
-    [HarmonyPatch]
-    public static class Patch_RecruitUtility_Recruit
-    {
-        static System.Reflection.MethodBase TargetMethod()
-        {
-            var t = AccessTools.TypeByName("RimWorld.RecruitUtility");
-            if (t == null) return null;
-            return AccessTools.Method(t, "Recruit") ?? AccessTools.Method(t, "DoRecruit");
-        }
-
-        public static void Postfix(Pawn recruiter, Pawn recruitee)
-        {
-            Patch_DoRecruit_StartArc.Postfix(recruiter, recruitee);
-        }
-    }
 }

@@ -1,4 +1,5 @@
 using System;
+using RimWorld;
 using Verse;
 
 namespace XenoDirector
@@ -40,7 +41,7 @@ namespace XenoDirector
         public static bool AllowHeavy(GameSubsystemId id)
         {
             var opt = XenoDirectorGameComponent.GetOpt();
-            if (opt == null || !opt.enabled) return true; // sem diretor = comportamento vanilla
+            if (opt == null || !opt.Enabled) return true; // sem diretor = comportamento vanilla
             return opt.ShouldRunHeavy(id);
         }
 

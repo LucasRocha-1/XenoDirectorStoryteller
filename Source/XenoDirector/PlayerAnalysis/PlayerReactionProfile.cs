@@ -58,7 +58,7 @@ namespace XenoDirector
 
             foreach (var s in _recentSamples)
             {
-                // Heurísticas simples (esqueleto). Em produção: features normalizadas + classificador.
+                // Pontua sinais observáveis; a classificação atual usa limiares simples.
                 if (s.WealthDelta > 0 && s.ColonistDeaths == 0) agg += 0.3f;
                 if (s.ColonistDeaths > 0) cau += 0.4f;
                 if (s.MoodSwing < -15f) cau += 0.2f;

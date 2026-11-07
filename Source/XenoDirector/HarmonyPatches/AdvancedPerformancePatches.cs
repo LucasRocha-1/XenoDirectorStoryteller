@@ -7,7 +7,7 @@ namespace XenoDirector
     /// Patches opt-in de performance avançada.
     /// Só têm efeito quando EnableAdvancedPerformance + AdvDynamicEntityThrottling estão ON.
     /// </summary>
-    [HarmonyPatch(typeof(Pawn), nameof(Pawn.Tick))]
+    [HarmonyPatch(typeof(Pawn), "Tick")]
     public static class Patch_Pawn_Tick_Throttle
     {
         [HarmonyPrefix]

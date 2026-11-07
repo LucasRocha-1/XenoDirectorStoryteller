@@ -79,24 +79,25 @@ namespace XenoDirector
         public string Id => "Opt_WorldPawns";
         public GameSubsystemId PrimarySubsystem => GameSubsystemId.WorldPawns;
 
+        private bool _pressureReported;
+
         public void ObserveAndAdvise(OptimizationContext ctx)
         {
             if (!ctx.Scheduler.ShouldRun(GameSubsystemId.WorldPawns)) return;
 
-            // World pawns acumulam em saves longos — marcar atividade só se mudou muito
             int count = Find.WorldPawns?.AllPawnsAlive?.Count() ?? 0;
             if (count > 200)
             {
                 ctx.Scheduler.ReportActivity(GameSubsystemId.WorldPawns);
-                // Enfileira limpeza leve se agressivo
-                if (ctx.AggressiveMode)
+                if (!_pressureReported && Prefs.DevMode)
                 {
-                    ctx.Scheduler.Enqueue(GameSubsystemId.MiscCleanup, () =>
-                    {
-                        // Placeholder: em produção chamaria rotinas de discard de world pawns mortos antigos
-                        // com cuidado de não quebrar quests/factions
-                    }, "WorldPawn soft pressure note");
+                    Log.Message($"[XenoDirector.Opt] World pawn pressure: {count} living world pawns.");
+                    _pressureReported = true;
                 }
+            }
+            else
+            {
+                _pressureReported = false;
             }
         }
     }

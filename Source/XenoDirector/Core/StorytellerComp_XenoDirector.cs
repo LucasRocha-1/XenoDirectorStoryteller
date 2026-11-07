@@ -24,8 +24,11 @@ namespace XenoDirector
 
     public class StorytellerComp_XenoDirector : StorytellerComp
     {
+        private const int CustomIncidentCooldownTicks = 60000 * 2;
+
         private DirectorBrain _director;
         private List<IMicroBrain> _permanentMicros = new List<IMicroBrain>();
+        private int _lastCustomIncidentTick = -CustomIncidentCooldownTicks;
         private bool _initialized;
 
         protected StorytellerCompProperties_XenoDirector Props => (StorytellerCompProperties_XenoDirector)props;
@@ -75,6 +78,9 @@ namespace XenoDirector
             foreach (var m in _director.GetActiveMicroBrains())
                 m.Tick(tick, gc);
 
+            if (tick - _lastCustomIncidentTick < CustomIncidentCooldownTicks)
+                yield break;
+
             var context = new IncidentContext
             {
                 Map = map,
@@ -97,18 +103,13 @@ namespace XenoDirector
                 if (prop != null) candidates.Add(prop);
             }
 
+            var arcProposal = gc.Arcs?.ProposeIncidentForActiveArc(rm);
+            if (arcProposal != null) candidates.Add(arcProposal);
+
             if (candidates.Count == 0) yield break;
 
             foreach (var best in candidates.OrderByDescending(c => c.Priority))
             {
-                if (best.Def == null && XenoDirectorMod.Settings.EnableCrossModCoordination)
-                {
-                    best.Def = ModIncidentCatalog.Instance.PickCoordinatedIncident(null);
-                }
-
-                if (best.Def == null)
-                    best.Def = DefDatabase<IncidentDef>.GetRandom();
-
                 if (best.Def == null) continue;
 
                 // FILTRO CENTRAL DE RESTRIÇÕES
@@ -123,6 +124,9 @@ namespace XenoDirector
                 if (best.SuggestedPoints > 0)
                     parms.points = best.SuggestedPoints;
 
+                _lastCustomIncidentTick = tick;
+                if (Prefs.DevMode)
+                    Log.Message($"[XenoDirector.Director] Proposed {best.Def.defName} from {best.SourceBrainId}; tag={best.NarrativeTag ?? "none"}, chain={best.ChainId ?? "none"}.");
                 yield return new FiringIncident(best.Def, this, parms);
                 yield break;
             }

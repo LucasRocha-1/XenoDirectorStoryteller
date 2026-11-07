@@ -19,10 +19,96 @@ namespace XenoDirector
 
         public IReadOnlyList<StoryArc> ActiveArcs => _arcs;
 
+        public IncidentCandidate ProposeIncidentForActiveArc(RestrictionManager restrictions)
+        {
+            if (!XenoDirectorMod.Settings.EnableNarrativeArcs)
+                return null;
+
+            foreach (var arc in _arcs
+                .Where(candidate => candidate != null && !candidate.Completed && !candidate.Failed)
+                .OrderBy(candidate => candidate.CreatedTick))
+            {
+                if (arc.PendingEventTags == null || arc.PendingEventTags.Count == 0)
+                    continue;
+
+                string tag = arc.PendingEventTags[0];
+                var keywords = GetIncidentKeywords(tag);
+                if (keywords == null)
+                    continue;
+
+                var def = DefDatabase<IncidentDef>.AllDefsListForReading
+                    .Where(candidate => candidate != null
+                        && candidate.category != null
+                        && (restrictions == null || !restrictions.IsIncidentBlocked(candidate))
+                        && MatchesArcKeywords(candidate, keywords))
+                    .OrderBy(candidate => candidate.defName, System.StringComparer.Ordinal)
+                    .FirstOrDefault();
+
+                if (def == null)
+                    continue;
+
+                return new IncidentCandidate
+                {
+                    Def = def,
+                    Priority = 1f,
+                    SourceBrainId = "Director_Arc",
+                    NarrativeTag = tag,
+                    ChainId = arc.ArcId
+                };
+            }
+
+            return null;
+        }
+
+        private static string[] GetIncidentKeywords(string tag)
+        {
+            switch (tag)
+            {
+                case "GlobalDrought":
+                    return new[] { "drought", "heatwave", "coldsnap", "toxicfallout", "flashstorm" };
+                case "MysteryDiseaseOutbreak":
+                    return new[] { "disease", "outbreak", "plague", "infection", "epidemic" };
+                case "IdeologyCureAttempt":
+                    return new[] { "cure", "healing", "disease", "infection" };
+                case "RegionalWar":
+                    return new[] { "raid", "war", "hostility" };
+                default:
+                    return null;
+            }
+        }
+
+        private static bool MatchesArcKeywords(IncidentDef def, IEnumerable<string> keywords)
+        {
+            foreach (var keyword in keywords)
+            {
+                if (ContainsKeyword(def.defName, keyword)
+                    || ContainsKeyword(def.label, keyword)
+                    || ContainsKeyword(def.category.defName, keyword))
+                    return true;
+
+                if (def.tags != null && def.tags.Any(tag => ContainsKeyword(tag, keyword)))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool ContainsKeyword(string value, string keyword)
+        {
+            return !string.IsNullOrEmpty(value)
+                && value.IndexOf(keyword, System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         public void ExposeData()
         {
+            if (Scribe.mode == LoadSaveMode.Saving)
+                ClearRescueEventQueues();
+
             Scribe_Collections.Look(ref _arcs, "Arcs", LookMode.Deep);
             if (_arcs == null) _arcs = new List<StoryArc>();
+
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+                ClearRescueEventQueues();
         }
 
         public void Tick(XenoDirectorGameComponent gc)
@@ -49,14 +135,9 @@ namespace XenoDirector
         {
             if (rescued == null) return null;
 
-            string xeno = null;
-            try
-            {
-                // Biotech
-                if (ModsConfig.BiotechActive && rescued.genes?.Xenotype != null)
-                    xeno = rescued.genes.Xenotype.defName;
-            }
-            catch { /* biotech ausente */ }
+            string xeno = ModsConfig.BiotechActive
+                ? IdeologyXenotypeMatcher.GetPawnXenotypeNames(rescued).FirstOrDefault()
+                : null;
 
             var arc = new StoryArc
             {
@@ -69,14 +150,7 @@ namespace XenoDirector
                 AnchorPawnLoadId = rescued.GetUniqueLoadID(),
                 AnchorFactionId = fromFaction?.def?.defName,
                 AnchorXenotypeDefName = xeno,
-                PendingEventTags = new List<string>
-                {
-                    "XenotypeHunters",
-                    "AssassinationAttempt",
-                    "ReturnEscort",
-                    "AmbushOnReturn",
-                    "FactionRaidLinked"
-                }
+                PendingEventTags = new List<string>()
             };
 
             if (fromFaction != null)
@@ -158,6 +232,12 @@ namespace XenoDirector
 
         private void PulseArc(StoryArc arc, XenoDirectorGameComponent gc)
         {
+            if (arc.ArcType == "RescueChain")
+            {
+                PulseRescueArc(arc, gc);
+                return;
+            }
+
             if (arc.PendingEventTags == null || arc.PendingEventTags.Count == 0)
             {
                 arc.Completed = true;
@@ -215,14 +295,62 @@ namespace XenoDirector
                     break;
             }
 
-            if (ok) arc.Advance(tag);
+            if (ok)
+            {
+                arc.Advance(tag);
+                if (Prefs.DevMode)
+                    Log.Message($"[XenoDirector.Arc] {arc.ArcId}: step {arc.CurrentStep}/{arc.TotalSteps} completed ({tag}).");
+            }
             else
             {
                 // Re-enfileira no fim se falhou (facção sumiu, etc.)
                 arc.PendingEventTags.Add(tag);
+                if (Prefs.DevMode)
+                    Log.Message($"[XenoDirector.Arc] {arc.ArcId}: step {tag} failed; queued for retry.");
             }
 
             gc.OptDirector?.NotifyActivity(GameSubsystemId.Incidents);
+        }
+
+        private void PulseRescueArc(StoryArc arc, XenoDirectorGameComponent gc)
+        {
+            if (arc.CurrentStep >= arc.TotalSteps)
+            {
+                arc.Completed = true;
+                return;
+            }
+
+            if (!CanRunNextStep(arc)) return;
+
+            arc.Flags["lastStepTick"] = Find.TickManager.TicksGame.ToString();
+            if (NarrativeWorldAccess.Instance.TryRunNextRescueEvent(arc))
+            {
+                arc.Advance();
+                if (Prefs.DevMode)
+                    Log.Message($"[XenoDirector.Arc] {arc.ArcId}: rescue step {arc.CurrentStep}/{arc.TotalSteps} completed.");
+            }
+            else if (Prefs.DevMode)
+            {
+                Log.Message($"[XenoDirector.Arc] {arc.ArcId}: rescue step {arc.CurrentStep + 1}/{arc.TotalSteps} could not run; will retry.");
+            }
+
+            gc.OptDirector?.NotifyActivity(GameSubsystemId.Incidents);
+        }
+
+        private static bool CanRunNextStep(StoryArc arc)
+        {
+            const int minGap = 60000 * 2;
+            return !arc.Flags.TryGetValue("lastStepTick", out var lastStr)
+                || !int.TryParse(lastStr, out var last)
+                || Find.TickManager.TicksGame - last >= minGap;
+        }
+
+        private void ClearRescueEventQueues()
+        {
+            if (_arcs == null) return;
+            foreach (var arc in _arcs)
+                if (arc?.ArcType == "RescueChain")
+                    arc.PendingEventTags?.Clear();
         }
     }
 }

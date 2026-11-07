@@ -33,15 +33,9 @@ namespace XenoDirector
             if (s.AdvWorldPawnAggressiveCull && tick - _lastDeepScanTick > 10000)
             {
                 _lastDeepScanTick = tick;
-                // Só reporta pressão; cull real de world pawns é perigoso — enfileira análise
-                SafeBackgroundQueue.EnqueueCompute(
-                    () => { /* snapshot counts only */ },
-                    () =>
-                    {
-                        int n = Find.WorldPawns?.AllPawnsAlive?.Count() ?? 0;
-                        if (n > s.AdvWorldPawnSoftCap)
-                            PerformanceGuards.ReportActivity(GameSubsystemId.WorldPawns);
-                    });
+                int worldPawnCount = Find.WorldPawns?.AllPawnsAlive?.Count() ?? 0;
+                if (worldPawnCount > s.AdvWorldPawnSoftCap)
+                    PerformanceGuards.ReportActivity(GameSubsystemId.WorldPawns);
             }
 
             if (s.AdvPeriodicGcHint && tick - _lastGcHintTick > 180000) // ~3 dias

@@ -54,7 +54,7 @@ Estilo “otimizador ativo” (ideia similar a mods de Minecraft), adaptado ao p
 ### Exemplo: seca global
 
 1. Condição de seca/calor na região  
-2. Migração marcada de settlements  
+2. Planos de migração com tile candidato (sem mover settlements automaticamente)
 3. Hostilidade entre facções deslocadas  
 
 ### Exemplo: pandemia
@@ -63,6 +63,25 @@ Estilo “otimizador ativo” (ideia similar a mods de Minecraft), adaptado ao p
 2. Cada facção reage segundo ideologia (genes / Anima-Gauranlen-Polux / void)  
 
 DevMode: botões no settings para disparar seca e pandemia de teste.
+
+Arcos de resgate consultam Ideology e Biotech: ideologias primárias e minoritárias
+de facções visíveis são verificadas em busca de preceitos de aversão a xenótipos,
+incluindo termos negativos comuns usados por mods. Preceitos são inspecionados de
+forma limitada por reflexão; uma preferência positiva por xenótipo, sozinha, não
+é tratada como ódio. O arco verifica o mundo a cada etapa e gera um plano
+temporário: perseguidores ideológicos, facções rivais à facção original do pawn,
+interferências e a oferta de retorno podem variar conforme as facções e ideologias
+atuais. As opções e os planos não são serializados. Quests de escolta são geradas
+sob demanda a partir de `QuestScriptDef` carregadas cujo conteúdo indica
+escolta/resgate/retorno/transporte; nenhuma quest-modelo é mantida em cache.
+Preceitos modded só podem ser reconhecidos quando seus nomes/tipos e dados expõem
+explicitamente xenótipo e aversão.
+
+O contrato `INarrativeContentFactory` separa a criação de eventos e missões
+temporários. O factory de resgate monta eventos próprios com motivação, facção,
+texto e efeito escolhidos no momento, usando ataques do jogo como mecanismo; a
+missão de retorno é criada separadamente e pode ser combinada com novas peças
+narrativas sem salvar modelos ou listas de possibilidades no arco.
 
 ---
 
@@ -85,6 +104,11 @@ HarmonyPatches/ Restrictions, Narrative sync, Advanced tick throttle
 Ajuste caminhos RimWorld/Harmony no `.csproj`, `dotnet build -c Release`, copie DLL para `Assemblies/`.
 
 Harmony deve carregar antes deste mod.
+
+## Testes isolados
+
+Execute `dotnet run --project Tests\RestrictionPatchTests\RestrictionPatchTests.csproj -c Release`.
+Os testes usam doubles das APIs do RimWorld e verificam a filtragem de PawnKinds, a enumeração lazy e a restauração das opções após falhas; não substituem o teste dentro do jogo.
 
 ---
 
